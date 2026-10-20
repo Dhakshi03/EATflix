@@ -38,7 +38,7 @@ import {
   X,
 } from "lucide-react";
 
-// Extra curated Swiggy + Insta trending dishes to make the feed rich with 45+ varied options
+// Curated trending dishes to make the feed rich with 45+ varied options
 const TRENDING_FEED_FOODS: Food[] = [
   {
     id: "feed_paneer_tikka_bowl",
@@ -564,10 +564,10 @@ export default function DiscoverPage() {
   const [activeStory, setActiveStory] = useState<StoryCategory>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [quickChip, setQuickChip] = useState<"none" | "quick" | "fibre" | "light" | "iron" | "liked">("none");
-  const [viewLayout, setViewLayout] = useState<"insta" | "swiggy">("insta");
+  const [viewLayout, setViewLayout] = useState<"cards" | "list">("cards");
   const [targetMeal, setTargetMeal] = useState<MealType>("snack");
 
-  // Per-card portion multiplier (e.g. 1, 1.5, 2) & Swiggy Plate Cart
+  // Per-card portion multiplier (e.g. 1, 1.5, 2) & Meal Plate Cart
   const [multipliers, setMultipliers] = useState<Record<string, number>>({});
   const [plateCart, setPlateCart] = useState<Record<string, number>>({});
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
@@ -600,7 +600,7 @@ export default function DiscoverPage() {
   const totals = useMemo(() => aggregateDailyNutrients(logs).totals, [logs]);
   const gaps = useMemo(() => (goals ? calculateNutrientGaps(totals, goals) : null), [totals, goals]);
 
-  // Combine Saved Foods + Starter Foods + Curated Trending Swiggy/Insta Dishes
+  // Combine Saved Foods + Starter Foods + Curated Trending Dishes
   const allFeedFoods = useMemo(() => {
     const base = mergeSavedAndCommonFoods(foods);
     const seen = new Set(base.map((f) => f.name.toLowerCase()));
@@ -637,7 +637,7 @@ export default function DiscoverPage() {
       const proteinGap = Math.max(1, gaps?.proteinGap || goals.protein || 80);
       const pctOfGap = Math.min(100, Math.round((protein / proteinGap) * 100));
 
-      // Deterministic rating & prep time for Swiggy feel
+      // Deterministic rating & prep time for discovery cards
       const rating = (4.5 + ((index * 7) % 5) * 0.1).toFixed(1);
       const prepMins = food.preparationEffort === "low" ? "5 mins" : food.preparationEffort === "high" ? "20 mins" : "12 mins";
 
@@ -870,7 +870,7 @@ export default function DiscoverPage() {
     await load();
   };
 
-  // Summary of sticky bottom Swiggy Plate Cart
+  // Summary of sticky bottom Plate Cart
   const plateSummary = useMemo(() => {
     let count = 0;
     let protein = 0;
@@ -929,10 +929,10 @@ export default function DiscoverPage() {
           <div>
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 rounded bg-[#E50914] text-white text-[10px] font-black uppercase tracking-wider">
-                CRAVING FEED
+                TOP PICKS
               </span>
               <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                Top Picks • Insta × Swiggy Feed
+                Top Picks • Today&apos;s Craving Feed
               </h1>
             </div>
             <p className="text-xs text-zinc-400 mt-0.5">
@@ -958,29 +958,29 @@ export default function DiscoverPage() {
               </select>
             </div>
 
-            {/* Layout Toggle (Insta Grid vs Swiggy List) */}
+            {/* Layout Toggle (Cards vs List) */}
             <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
               <button
                 type="button"
-                onClick={() => setViewLayout("insta")}
+                onClick={() => setViewLayout("cards")}
                 className={`p-1.5 rounded-lg text-xs flex items-center gap-1 transition ${
-                  viewLayout === "insta" ? "bg-[#E50914] text-white font-bold" : "text-zinc-400 hover:text-white"
+                  viewLayout === "cards" ? "bg-[#E50914] text-white font-bold" : "text-zinc-400 hover:text-white"
                 }`}
-                title="Insta Feed Cards"
+                title="Visual Cards View"
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline text-[11px]">Insta</span>
+                <span className="hidden sm:inline text-[11px]">Cards</span>
               </button>
               <button
                 type="button"
-                onClick={() => setViewLayout("swiggy")}
+                onClick={() => setViewLayout("list")}
                 className={`p-1.5 rounded-lg text-xs flex items-center gap-1 transition ${
-                  viewLayout === "swiggy" ? "bg-[#E50914] text-white font-bold" : "text-zinc-400 hover:text-white"
+                  viewLayout === "list" ? "bg-[#E50914] text-white font-bold" : "text-zinc-400 hover:text-white"
                 }`}
-                title="Swiggy Menu View"
+                title="Menu List View"
               >
                 <List className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline text-[11px]">Swiggy</span>
+                <span className="hidden sm:inline text-[11px]">List</span>
               </button>
             </div>
 
@@ -1039,7 +1039,7 @@ export default function DiscoverPage() {
           </div>
         )}
 
-        {/* SWIGGY × INSTA STORY BUBBLES ("What's on your mind?") */}
+        {/* STORY BUBBLES ("What are you craving?") */}
         <section className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-extrabold uppercase tracking-wider text-zinc-400">
@@ -1089,7 +1089,7 @@ export default function DiscoverPage() {
           </div>
         </section>
 
-        {/* SWIGGY SEARCH BAR + FILTER CHIPS */}
+        {/* SEARCH BAR + FILTER CHIPS */}
         <div className="space-y-2.5 sticky top-14 md:top-16 z-30 py-2 bg-[#101012]/95 backdrop-blur-xl border-b border-zinc-800/80">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3.5 top-3 text-zinc-400" />
@@ -1136,8 +1136,8 @@ export default function DiscoverPage() {
           </div>
         </div>
 
-        {/* FEED ITEMS: INSTA POST CARDS OR SWIGGY MENU LIST */}
-        {viewLayout === "insta" ? (
+        {/* FEED ITEMS: VISUAL CARDS OR MENU LIST */}
+        {viewLayout === "cards" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {feedItems.map((item, idx) => {
               const posterUrl = getFoodPosterUrl(item.food.name, item.food.category);
@@ -1149,7 +1149,7 @@ export default function DiscoverPage() {
                   key={item.food.id}
                   className="rounded-3xl bg-[#18181b] border border-zinc-800/90 hover:border-[#E50914]/50 overflow-hidden flex flex-col justify-between shadow-xl transition-all group"
                 >
-                  {/* Insta + Swiggy Visual Header */}
+                  {/* Visual Dish Header */}
                   <div
                     onDoubleClick={() => handleToggleLike(item.food)}
                     className="relative h-48 w-full overflow-hidden bg-zinc-900 select-none cursor-pointer"
@@ -1200,7 +1200,7 @@ export default function DiscoverPage() {
                       </span>
                     </div>
 
-                    {/* Top Right: Insta Like / Bookmark Heart Button */}
+                    {/* Top Right: Like / Bookmark Heart Button */}
                     <button
                       type="button"
                       aria-label={`Save ${item.food.name}`}
@@ -1287,7 +1287,7 @@ export default function DiscoverPage() {
                       </div>
                     </div>
 
-                    {/* Swiggy ADD + Plate Button & Instant Log Button */}
+                    {/* ADD + Plate Button & Instant Log Button */}
                     <div className="pt-2 border-t border-zinc-800/80 flex items-center gap-2">
                       {inPlateMult > 0 ? (
                         <div className="flex-1 flex items-center justify-between bg-emerald-500/15 border border-emerald-500/40 rounded-xl px-2.5 py-1.5">
@@ -1334,7 +1334,7 @@ export default function DiscoverPage() {
             })}
           </div>
         ) : (
-          /* SWIGGY MENU LIST VIEW */
+          /* COMPACT MENU LIST VIEW */
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {feedItems.map((item) => {
               const posterUrl = getFoodPosterUrl(item.food.name, item.food.category);
@@ -1378,7 +1378,7 @@ export default function DiscoverPage() {
                     </p>
                   </div>
 
-                  {/* Right Swiggy Image + Overlapping ADD Stepper */}
+                  {/* Right Dish Image + Overlapping ADD Stepper */}
                   <div className="relative w-28 h-28 flex-shrink-0 mb-2">
                     <img
                       src={posterUrl}
@@ -1422,7 +1422,7 @@ export default function DiscoverPage() {
         )}
       </main>
 
-      {/* SWIGGY-STYLE STICKY BOTTOM PLATE / CART BAR */}
+      {/* STICKY BOTTOM PLATE / CART BAR */}
       {plateSummary.count > 0 && (
         <div className="fixed bottom-16 md:bottom-5 left-0 right-0 z-40 px-4 animate-fadeIn">
           <div className="max-w-xl mx-auto p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 text-white shadow-2xl flex items-center justify-between gap-3 border border-white/20">
