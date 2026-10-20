@@ -1,0 +1,55 @@
+<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#18181c" />
+      <stop offset="55%" stop-color="#0b0b0e" />
+      <stop offset="100%" stop-color="#050507" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="18%" r="70%">
+      <stop offset="0%" stop-color="#E50914" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#E50914" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="spine" x1="120" y1="76" x2="205" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#99050d" />
+      <stop offset="50%" stop-color="#b80710" />
+      <stop offset="100%" stop-color="#7a0309" />
+    </linearGradient>
+    <linearGradient id="ribbon" x1="120" y1="76" x2="410" y2="410" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ff2a36" />
+      <stop offset="45%" stop-color="#E50914" />
+      <stop offset="100%" stop-color="#b80710" />
+    </linearGradient>
+    <linearGradient id="leaf" x1="340" y1="200" x2="425" y2="285" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#46d369" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#bg)" />
+  <rect width="512" height="512" rx="116" fill="url(#glow)" />
+
+  <!-- Left Spine of the E -->
+  <path d="M128 94C128 84 136 76 146 76H205V440C184 433 150 433 128 440V94Z" fill="url(#spine)" />
+
+  <!-- Fold Shadows -->
+  <path d="M128 76H222L205 180H128V76Z" fill="#000000" fill-opacity="0.45" />
+  <path d="M128 214H222L205 300H128V214Z" fill="#000000" fill-opacity="0.45" />
+  <path d="M128 340H222L205 440H128V340Z" fill="#000000" fill-opacity="0.45" />
+
+  <!-- Top Ribbon -->
+  <path d="M128 76H384C394 76 402 84 402 94V140C402 150 394 158 384 158H128V76Z" fill="url(#ribbon)" />
+
+  <!-- Middle Fork / Macro Ribbon -->
+  <path d="M128 218H332C342 218 350 226 350 236V278C350 288 342 296 332 296H128V218Z" fill="url(#ribbon)" />
+  <!-- Fork Tines -->
+  <rect x="282" y="230" width="46" height="10" rx="5" fill="#0b0b0e" />
+  <rect x="282" y="251" width="46" height="10" rx="5" fill="#0b0b0e" />
+  <rect x="282" y="272" width="46" height="10" rx="5" fill="#0b0b0e" />
+
+  <!-- Bottom Arched Ribbon -->
+  <path d="M128 354H384C394 354 402 362 402 372V422C402 432 392 439 382 437C298 421 214 421 128 440V354Z" fill="url(#ribbon)" />
+
+  <!-- Vitality Leaf Accent -->
+  <path d="M366 252C366 224 394 204 418 204C418 232 398 260 366 252Z" fill="url(#leaf)" />
+  <circle cx="376" cy="272" r="9.5" fill="#46d369" />
+</svg>
