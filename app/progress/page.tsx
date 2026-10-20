@@ -216,18 +216,35 @@ export default function ProgressPage() {
     showToast(`Target weight updated to ${tw} kg!`);
   };
 
-  const handleSwitchGoal = async (nextGoal: FitnessGoal) => {
+  const activeGoalsList: FitnessGoal[] =
+    profile?.fitnessGoals && profile.fitnessGoals.length > 0
+      ? profile.fitnessGoals
+      : profile?.fitnessGoal
+      ? [profile.fitnessGoal]
+      : ["maintain"];
+
+  const handleToggleGoal = async (gKey: FitnessGoal) => {
     if (!profile) return;
+    let next: FitnessGoal[];
+    if (activeGoalsList.includes(gKey)) {
+      next = activeGoalsList.filter((g) => g !== gKey);
+      if (next.length === 0 && !profile.customGoal) {
+        next = [gKey];
+      }
+    } else {
+      next = [...activeGoalsList, gKey];
+    }
     const nextTarget =
-      nextGoal === "fat_loss" && profile.weightKg
+      next.includes("fat_loss") && profile.weightKg
         ? Math.max(40, Math.round((profile.weightKg - 4) * 10) / 10)
-        : nextGoal === "muscle_gain" && profile.weightKg
+        : next.includes("muscle_gain") && profile.weightKg
         ? Math.round((profile.weightKg + 4) * 10) / 10
         : profile.weightKg ?? profile.targetWeightKg ?? null;
 
     const updated: UserProfile = {
       ...profile,
-      fitnessGoal: nextGoal,
+      fitnessGoals: next,
+      fitnessGoal: next[0] || "maintain",
       targetWeightKg: profile.targetWeightKg ?? nextTarget,
     };
     const rec = calculateRecommendedGoals(updated);
@@ -236,7 +253,7 @@ export default function ProgressPage() {
     setProfile(updated);
     setGoals(rec.goals);
     if (updated.targetWeightKg != null) setTargetWeightInput(String(updated.targetWeightKg));
-    showToast(`Switched goal to ${GOAL_META[nextGoal].label} (${rec.goals.calories} kcal, ${rec.goals.protein}g protein)!`);
+    showToast(`Updated goals (${rec.goals.calories} kcal, ${rec.goals.protein}g protein)!`);
   };
 
   const handleAdjustWater = async (deltaLitres: number) => {
@@ -440,33 +457,47 @@ export default function ProgressPage() {
             <div className="flex items-center gap-2.5">
               <span className="text-2xl">{activeGoalMeta.emoji}</span>
               <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-extrabold text-white">{activeGoalMeta.label}</h2>
-                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${activeGoalMeta.badgeClass}`}>
-                    Active Goal
-                  </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <h2 className="text-base font-extrabold text-white">Your Health Goals</h2>
+                  {activeGoalsList.map((gVal) => (
+                    <span
+                      key={gVal}
+                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                        GOAL_META[gVal]?.badgeClass || "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                      }`}
+                    >
+                      {GOAL_META[gVal]?.emoji} {GOAL_META[gVal]?.label}
+                    </span>
+                  ))}
+                  {profile?.customGoal && (
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-purple-500/15 text-purple-300 border-purple-500/30">
+                      ✍️ {profile.customGoal}
+                    </span>
+                  )}
                 </div>
-                <p className="text-xs text-gray-400">{activeGoalMeta.tagline}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Select 1 or more goals below to adjust your daily macro targets &amp; milestones
+                </p>
               </div>
             </div>
             <Link
               href="/profile"
               className="text-xs text-brand-400 hover:underline font-semibold"
             >
-              Customize Goal Questions →
+              Edit All Goals in Profile →
             </Link>
           </div>
 
-          {/* 1-Tap Goal Switcher Pills for Everyone */}
+          {/* 1-Tap Multi-Goal Switcher Pills */}
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
             {(Object.keys(GOAL_META) as FitnessGoal[]).map((gKey) => {
               const item = GOAL_META[gKey];
-              const isSelected = activeGoalKey === gKey;
+              const isSelected = activeGoalsList.includes(gKey);
               return (
                 <button
                   key={gKey}
                   type="button"
-                  onClick={() => handleSwitchGoal(gKey)}
+                  onClick={() => handleToggleGoal(gKey)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border transition ${
                     isSelected
                       ? "bg-[#E50914] border-[#E50914] text-white shadow-md shadow-[#E50914]/25"
@@ -475,9 +506,17 @@ export default function ProgressPage() {
                 >
                   <span>{item.emoji}</span>
                   <span>{item.label}</span>
+                  {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                 </button>
               );
             })}
+            {profile?.customGoal && (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border bg-purple-600 border-purple-500 text-white">
+                <span>✍️</span>
+                <span>{profile.customGoal}</span>
+                <Check className="w-3 h-3 stroke-[3]" />
+              </span>
+            )}
           </div>
 
           {/* Grid: Weight Tracker + Hydration & Workout Habit Trackers */}
@@ -748,23 +787,25 @@ export default function ProgressPage() {
               <div className="p-4 rounded-2xl bg-gradient-to-br from-[#E50914]/15 via-gray-900 to-gray-900 border border-[#E50914]/30 space-y-1.5">
                 <div className="flex items-center gap-1.5 text-xs font-extrabold text-white">
                   <Sparkles className="w-3.5 h-3.5 text-[#E50914]" />
-                  <span>{activeGoalMeta.label} Focus</span>
+                  <span>Personalized Goal Focus</span>
                 </div>
                 <p className="text-[11px] text-gray-300 leading-relaxed">
-                  {activeGoalKey === "fat_loss" &&
-                    `Aim for ${goals.calories} kcal/day and at least ${goals.protein}g protein + ${goals.fibre}g fibre so you stay full while burning fat steadily.`}
-                  {activeGoalKey === "muscle_gain" &&
-                    `Hit ${goals.protein}g protein (${
+                  {activeGoalsList.includes("fat_loss") &&
+                    `🔥 Aim for ${goals.calories} kcal/day and at least ${goals.protein}g protein + ${goals.fibre}g fibre to burn fat while staying satiated. `}
+                  {activeGoalsList.includes("muscle_gain") &&
+                    `💪 Hit ${goals.protein}g protein (${
                       profile?.weightKg ? `${Math.round((goals.protein / profile.weightKg) * 10) / 10}g/kg` : "1.8g/kg"
-                    }) and ${goals.calories} kcal/day alongside ${workoutTargetPerWeek} strength sessions/week.`}
-                  {activeGoalKey === "maintain" &&
-                    `Keep your weight within ±1.5 kg of ${
+                    }) alongside ${workoutTargetPerWeek} training sessions/week for lean muscle growth. `}
+                  {activeGoalsList.includes("maintain") && !activeGoalsList.includes("fat_loss") && !activeGoalsList.includes("muscle_gain") &&
+                    `⚖️ Keep your weight within ±1.5 kg of ${
                       weightRoadmap?.targetKg ?? profile?.weightKg ?? 60
-                    } kg while hitting ${goals.protein}g protein daily.`}
-                  {activeGoalKey === "athletic_performance" &&
-                    `Fuel your sessions with ${goals.carbohydrates}g carbs, ${goals.protein}g protein, and ${waterGoalLitres}L hydration daily.`}
-                  {activeGoalKey === "wellness_vitality" &&
-                    `Prioritize ${goals.fibre}g+ gut fibre, ${goals.iron ?? 18}mg iron, ${goals.calcium ?? 1000}mg calcium, and ${waterGoalLitres}L water every day.`}
+                    } kg while hitting ${goals.protein}g protein daily. `}
+                  {activeGoalsList.includes("athletic_performance") &&
+                    `⚡ Fuel workouts with ${goals.carbohydrates}g carbs, ${goals.protein}g protein, and ${waterGoalLitres}L hydration daily. `}
+                  {activeGoalsList.includes("wellness_vitality") &&
+                    `🌿 Prioritize ${goals.fibre}g+ gut fibre, ${goals.iron ?? 18}mg iron, ${goals.calcium ?? 1000}mg calcium, and ${waterGoalLitres}L water every day. `}
+                  {profile?.customGoal &&
+                    `✍️ Custom Target: "${profile.customGoal}". `}
                 </p>
               </div>
             </div>

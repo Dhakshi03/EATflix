@@ -7,6 +7,7 @@ import {
   UserProfile,
   NutritionGoal,
   ActivityLevel,
+  FitnessGoal,
 } from "./types";
 
 export class IncompatibleUnitError extends Error {
@@ -343,24 +344,40 @@ export function calculateRecommendedGoals(profile: Partial<UserProfile>): {
   const bmr = 10 * weight + 6.25 * height - 5 * age + sexOffset;
   const tdee = bmr * ACTIVITY_MULTIPLIERS[activity];
 
+  const goalsList: FitnessGoal[] =
+    profile.fitnessGoals && profile.fitnessGoals.length > 0
+      ? profile.fitnessGoals
+      : profile.fitnessGoal
+      ? [profile.fitnessGoal]
+      : ["maintain"];
+
+  const hasFatLoss = goalsList.includes("fat_loss");
+  const hasMuscleGain = goalsList.includes("muscle_gain");
+  const hasAthletic = goalsList.includes("athletic_performance");
+  const hasWellness = goalsList.includes("wellness_vitality");
+
   let goalAdjustment = 0;
-  if (profile.fitnessGoal === "fat_loss") {
+  if (hasFatLoss && hasMuscleGain) {
+    // Body Recomposition: lean deficit with high protein
+    goalAdjustment = -150;
+  } else if (hasFatLoss) {
     const pace = profile.weeklyPaceKg ?? 0.35;
     goalAdjustment = pace >= 0.7 ? -550 : pace <= 0.25 ? -250 : -350;
-  } else if (profile.fitnessGoal === "muscle_gain") {
+  } else if (hasMuscleGain) {
     const pace = profile.weeklyPaceKg ?? 0.25;
     goalAdjustment = pace >= 0.5 ? 350 : pace <= 0.2 ? 200 : 250;
-  } else if (profile.fitnessGoal === "athletic_performance") {
+  } else if (hasAthletic) {
     goalAdjustment = 150;
   }
 
   const targetCalories = Math.max(1200, Math.round((tdee + goalAdjustment) / 50) * 50);
 
   let proteinPerKg = ACTIVITY_PROTEIN_PER_KG[activity];
-  if (profile.fitnessGoal === "muscle_gain") proteinPerKg = Math.max(proteinPerKg, 1.8);
-  if (profile.fitnessGoal === "fat_loss") proteinPerKg = Math.max(proteinPerKg, 1.7);
-  if (profile.fitnessGoal === "athletic_performance") proteinPerKg = Math.max(proteinPerKg, 1.75);
-  if (profile.fitnessGoal === "wellness_vitality") proteinPerKg = Math.max(proteinPerKg, 1.5);
+  if (hasMuscleGain && hasFatLoss) proteinPerKg = Math.max(proteinPerKg, 1.85);
+  else if (hasMuscleGain) proteinPerKg = Math.max(proteinPerKg, 1.8);
+  else if (hasFatLoss) proteinPerKg = Math.max(proteinPerKg, 1.7);
+  else if (hasAthletic) proteinPerKg = Math.max(proteinPerKg, 1.75);
+  else if (hasWellness) proteinPerKg = Math.max(proteinPerKg, 1.5);
 
   const focus = profile.focusAreas || [];
   if (focus.some((f) => f.toLowerCase().includes("protein"))) {
@@ -373,7 +390,7 @@ export function calculateRecommendedGoals(profile: Partial<UserProfile>): {
   const carbohydrates = Math.round(remainingCalForCarbs / 4 / 5) * 5;
   let fibre = Math.max(22, Math.min(40, Math.round((targetCalories / 1000) * 14)));
   if (
-    profile.fitnessGoal === "wellness_vitality" ||
+    hasWellness ||
     focus.some((f) => f.toLowerCase().includes("gut") || f.toLowerCase().includes("fibre"))
   ) {
     fibre = Math.max(fibre, 30);
@@ -401,11 +418,21 @@ export function calculateRecommendedGoals(profile: Partial<UserProfile>): {
   if (hasHeight) parts.push(`${height} cm`);
   if (hasAge) parts.push(`age ${age}`);
   parts.push(activity.replace("_", " "));
-  if (profile.fitnessGoal === "fat_loss") parts.push(`weight loss (${goalAdjustment} kcal)`);
-  else if (profile.fitnessGoal === "muscle_gain") parts.push(`muscle & weight gain (+${goalAdjustment} kcal)`);
-  else if (profile.fitnessGoal === "athletic_performance") parts.push("athletic stamina (+150 kcal)");
-  else if (profile.fitnessGoal === "wellness_vitality") parts.push("gut, hair & micronutrient vitality");
-  else parts.push("maintenance");
+
+  const goalDescriptions: string[] = [];
+  if (hasFatLoss && hasMuscleGain) goalDescriptions.push("body recomp (fat loss + muscle)");
+  else {
+    if (hasFatLoss) goalDescriptions.push(`weight loss (${goalAdjustment} kcal)`);
+    if (hasMuscleGain) goalDescriptions.push(`muscle gain (+${goalAdjustment} kcal)`);
+  }
+  if (hasAthletic) goalDescriptions.push("athletic stamina");
+  if (hasWellness) goalDescriptions.push("vitality & gut health");
+  if (profile.customGoal && profile.customGoal.trim()) {
+    goalDescriptions.push(profile.customGoal.trim());
+  }
+  if (goalDescriptions.length === 0) goalDescriptions.push("maintenance");
+
+  parts.push(goalDescriptions.join(" + "));
 
   return {
     goals: {
@@ -451,10 +478,19 @@ export function calculateWeightGoalRoadmap(profile?: Partial<UserProfile> | null
       ? history[0].weightKg
       : currentKg;
 
+  const goalsList: FitnessGoal[] =
+    profile.fitnessGoals && profile.fitnessGoals.length > 0
+      ? profile.fitnessGoals
+      : profile.fitnessGoal
+      ? [profile.fitnessGoal]
+      : ["maintain"];
+  const hasFatLoss = goalsList.includes("fat_loss");
+  const hasMuscleGain = goalsList.includes("muscle_gain");
+
   const defaultTarget =
-    profile.fitnessGoal === "fat_loss"
+    hasFatLoss
       ? Math.max(40, Math.round((currentKg - 4) * 10) / 10)
-      : profile.fitnessGoal === "muscle_gain"
+      : hasMuscleGain
       ? Math.round((currentKg + 4) * 10) / 10
       : currentKg;
 
@@ -467,7 +503,7 @@ export function calculateWeightGoalRoadmap(profile?: Partial<UserProfile> | null
   const direction: "lose" | "gain" | "maintain" =
     Math.abs(targetKg - startKg) < 0.3 && Math.abs(diffFromCurrent) < 0.3
       ? "maintain"
-      : targetKg < currentKg || (targetKg < startKg && profile.fitnessGoal === "fat_loss")
+      : targetKg < currentKg || (targetKg < startKg && hasFatLoss)
       ? "lose"
       : "gain";
 

@@ -145,6 +145,8 @@ export interface UserProfile {
   dailyCheckIns?: Record<string, DailyHabitCheckIn>;
   biologicalSex?: BiologicalSex | null;
   fitnessGoal?: FitnessGoal | null;
+  fitnessGoals?: FitnessGoal[];
+  customGoal?: string | null;
   dietaryPreference: DietaryPreference;
   allergiesAndExclusions: string[];
   activityLevel?: ActivityLevel;

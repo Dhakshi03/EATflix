@@ -51,9 +51,7 @@ import {
   LogOut,
   LogIn,
   Scale,
-  Droplets,
-  Dumbbell,
-  Flame,
+  Plus,
 } from "lucide-react";
 
 const GOAL_FIELDS: { key: keyof NutritionGoal; label: string; unit: string; required: boolean }[] = [
@@ -72,7 +70,7 @@ const GOAL_FIELDS: { key: keyof NutritionGoal; label: string; unit: string; requ
 
 const SLIDES = [
   { id: 0, title: "About You", subtitle: "Name, age & body", icon: User },
-  { id: 1, title: "Your Goal", subtitle: "Goal & questions", icon: Compass },
+  { id: 1, title: "Your Goals", subtitle: "Select 1+ goals & Qs", icon: Compass },
   { id: 2, title: "Daily Plan", subtitle: "Tailored macros", icon: Target },
   { id: 3, title: "Cloud Sync", subtitle: "Save & sync", icon: Cloud },
 ] as const;
@@ -105,7 +103,7 @@ const GOAL_CARDS: {
     title: "Lose Weight & Burn Fat",
     subtitle: "Calorie deficit with high protein & fibre so you stay full while losing fat",
     badge: "Weight Loss",
-    questionsPrompt: "Customize your weight-loss pace & habits",
+    questionsPrompt: "Weight-loss pace & habits",
     focusOptions: [
       "Control evening snacking",
       "High-protein satiety",
@@ -120,7 +118,7 @@ const GOAL_CARDS: {
     title: "Build Muscle & Gain Weight",
     subtitle: "Clean calorie surplus + 1.8g/kg protein to build lean strength and size",
     badge: "Muscle & Gain",
-    questionsPrompt: "Customize your muscle & weight-gain plan",
+    questionsPrompt: "Muscle & weight-gain plan",
     focusOptions: [
       "High protein (1.8g/kg+)",
       "Post-workout recovery",
@@ -135,7 +133,7 @@ const GOAL_CARDS: {
     title: "Maintain Weight & Tone",
     subtitle: "Stay at your healthiest weight while improving body composition & daily energy",
     badge: "Maintenance",
-    questionsPrompt: "Customize your maintenance & body-toning focus",
+    questionsPrompt: "Maintenance & body-toning focus",
     focusOptions: [
       "Body recomposition",
       "Consistent daily protein",
@@ -150,7 +148,7 @@ const GOAL_CARDS: {
     title: "Stamina & Athletic Energy",
     subtitle: "Fuel workouts, sports, and active days with optimal carbs, protein, and hydration",
     badge: "Performance",
-    questionsPrompt: "Customize your training & stamina fuel",
+    questionsPrompt: "Training & stamina fuel",
     focusOptions: [
       "Endurance & stamina carbs",
       "Fast muscle recovery",
@@ -165,7 +163,7 @@ const GOAL_CARDS: {
     title: "Gut, Hair/Skin & Micronutrients",
     subtitle: "Prioritize 30g+ fibre, iron, B12, zinc, folate & calcium for long-term vitality",
     badge: "Holistic Health",
-    questionsPrompt: "Choose the wellness areas that matter most to you",
+    questionsPrompt: "Wellness priorities",
     focusOptions: [
       "Hair & Iron Boost",
       "Gut & High Fibre (30g+)",
@@ -179,11 +177,6 @@ const GOAL_CARDS: {
 function formatGenderLabel(sex?: BiologicalSex | null): string {
   if (!sex) return "—";
   return GENDER_OPTIONS.find((g) => g.value === sex)?.label || sex.replace(/_/g, " ");
-}
-
-function formatGoalLabel(goal?: FitnessGoal | null): string {
-  const found = GOAL_CARDS.find((g) => g.value === goal);
-  return found ? found.title : "Maintain Weight & Tone";
 }
 
 function getMissingBasicFields(p: UserProfile): string[] {
@@ -217,6 +210,8 @@ export default function ProfilePage() {
   const [step2Saved, setStep2Saved] = useState(false);
   const [authEmail, setAuthEmail] = useState<string | null>(null);
   const [quickWeightInput, setQuickWeightInput] = useState<string>("");
+  const [customGoalInput, setCustomGoalInput] = useState<string>("");
+  const [isOtherGoalActive, setIsOtherGoalActive] = useState<boolean>(false);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -272,6 +267,8 @@ export default function ProfilePage() {
     const g = await getNutritionGoals();
     setProfile(p);
     setQuickWeightInput(p.weightKg != null ? String(p.weightKg) : "");
+    setCustomGoalInput(p.customGoal || "");
+    setIsOtherGoalActive(Boolean(p.customGoal && p.customGoal.trim()));
     setExclusions(p.allergiesAndExclusions.join(", "));
     const gRec = goalsToRecord(g);
     setGoals(gRec);
@@ -327,6 +324,31 @@ export default function ProfilePage() {
     setProfile((p) => (p ? { ...p, ...patch } : p));
   };
 
+  // Multi-Goal selection helpers
+  const selectedGoals: FitnessGoal[] =
+    profile.fitnessGoals && profile.fitnessGoals.length > 0
+      ? profile.fitnessGoals
+      : profile.fitnessGoal
+      ? [profile.fitnessGoal]
+      : ["maintain"];
+
+  const toggleGoal = (goalVal: FitnessGoal) => {
+    let next: FitnessGoal[];
+    if (selectedGoals.includes(goalVal)) {
+      next = selectedGoals.filter((g) => g !== goalVal);
+      // Ensure at least one goal or custom goal is kept
+      if (next.length === 0 && !isOtherGoalActive) {
+        next = [goalVal];
+      }
+    } else {
+      next = [...selectedGoals, goalVal];
+    }
+    setP({
+      fitnessGoals: next,
+      fitnessGoal: next[0] || "maintain",
+    });
+  };
+
   const toggleFocusArea = (area: string) => {
     const current = profile.focusAreas || [];
     const next = current.includes(area) ? current.filter((x) => x !== area) : [...current, area];
@@ -341,7 +363,6 @@ export default function ProfilePage() {
   const recommendation = calculateRecommendedGoals(profile);
   const bmiInfo = calculateBmiInfo(profile.heightCm, profile.weightKg);
   const weightRoadmap = calculateWeightGoalRoadmap(profile);
-  const activeGoalCard = GOAL_CARDS.find((g) => g.value === (profile.fitnessGoal || "maintain")) || GOAL_CARDS[2];
 
   const applyRecommendedToState = (customProfile?: UserProfile) => {
     const rec = calculateRecommendedGoals(customProfile || profile);
@@ -437,7 +458,7 @@ export default function ProfilePage() {
     }
     setProfile(updatedProfile);
     setStep1Saved(true);
-    setMsg({ type: "ok", text: "Basic details saved! Now choose your primary goal & preferences." });
+    setMsg({ type: "ok", text: "Basic details saved! Now choose your health goals & preferences." });
     goToStep(1);
   };
 
@@ -449,20 +470,25 @@ export default function ProfilePage() {
       return;
     }
 
+    const hasFatLoss = selectedGoals.includes("fat_loss");
+    const hasMuscleGain = selectedGoals.includes("muscle_gain");
+
     const defaultTargetWeight =
       profile.targetWeightKg ??
-      (profile.fitnessGoal === "fat_loss" && profile.weightKg
+      (hasFatLoss && profile.weightKg
         ? Math.max(40, Math.round((profile.weightKg - 4) * 10) / 10)
-        : profile.fitnessGoal === "muscle_gain" && profile.weightKg
+        : hasMuscleGain && profile.weightKg
         ? Math.round((profile.weightKg + 4) * 10) / 10
         : profile.weightKg ?? null);
 
     const updatedProfile: UserProfile = {
       ...profile,
-      fitnessGoal: profile.fitnessGoal || "maintain",
+      fitnessGoals: selectedGoals,
+      fitnessGoal: selectedGoals[0] || "maintain",
+      customGoal: isOtherGoalActive && customGoalInput.trim() ? customGoalInput.trim() : null,
       targetWeightKg: defaultTargetWeight,
       startingWeightKg: profile.startingWeightKg ?? profile.weightKg,
-      weeklyPaceKg: profile.weeklyPaceKg ?? (profile.fitnessGoal === "fat_loss" ? 0.5 : 0.25),
+      weeklyPaceKg: profile.weeklyPaceKg ?? (hasFatLoss ? 0.5 : 0.25),
       workoutDaysPerWeek: profile.workoutDaysPerWeek ?? 3,
       waterGoalLitres: profile.waterGoalLitres ?? 2.5,
     };
@@ -480,7 +506,7 @@ export default function ProfilePage() {
       setStep2Saved(true);
       setMsg({
         type: "ok",
-        text: `Goal saved! Calculated your personalized plan: ${rec.goals.calories} kcal & ${rec.goals.protein}g protein/day.`,
+        text: `Goals saved! Calculated your personalized plan: ${rec.goals.calories} kcal & ${rec.goals.protein}g protein/day.`,
       });
     }
 
@@ -563,7 +589,6 @@ export default function ProfilePage() {
         : profile.dietaryPreference === "eggitarian"
         ? "Eggitarian"
         : "Non-Vegetarian";
-    const goalLabel = formatGoalLabel(profile.fitnessGoal);
 
     return (
       <div className="min-h-screen pb-24 md:pb-12 flex flex-col">
@@ -573,7 +598,7 @@ export default function ProfilePage() {
             <div>
               <h1 className="text-2xl font-extrabold text-white">My Profile &amp; Goals</h1>
               <p className="text-xs text-gray-400 mt-0.5">
-                Your personal metrics, weight &amp; goal tracker, daily macro targets, and Cloud Sync
+                Your personal metrics, multi-goal roadmap, daily macro targets, and Cloud Sync
               </p>
             </div>
             <Link href="/" className="text-xs text-brand-400 hover:underline">
@@ -604,13 +629,28 @@ export default function ProfilePage() {
                 <div>
                   <h2 className="text-lg font-extrabold text-white">{profile.displayName}</h2>
                   {authEmail && <p className="text-xs text-emerald-400 font-medium">{authEmail}</p>}
-                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-brand-500/15 text-brand-300 border border-brand-500/30">
                       {dietLabel}
                     </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                      {goalLabel}
-                    </span>
+                    {selectedGoals.map((gVal) => {
+                      const card = GOAL_CARDS.find((c) => c.value === gVal);
+                      return (
+                        <span
+                          key={gVal}
+                          className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"
+                        >
+                          <span>{card?.emoji}</span>
+                          <span>{card?.badge || gVal}</span>
+                        </span>
+                      );
+                    })}
+                    {profile.customGoal && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30 flex items-center gap-1">
+                        <span>✍️</span>
+                        <span>{profile.customGoal}</span>
+                      </span>
+                    )}
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-gray-800 text-gray-300 capitalize">
                       {(profile.activityLevel || "moderate").replace("_", " ")} activity
                     </span>
@@ -708,7 +748,7 @@ export default function ProfilePage() {
                   <div className="flex items-center gap-2">
                     <Scale className="w-4 h-4 text-[#E50914]" />
                     <span className="text-xs font-extrabold text-white">
-                      {activeGoalCard.emoji} {activeGoalCard.title} Tracker
+                      Weight &amp; Goal Progress
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -721,7 +761,7 @@ export default function ProfilePage() {
                       }}
                       className="text-[11px] text-brand-400 hover:underline font-semibold"
                     >
-                      Change Goal →
+                      Edit Goals →
                     </button>
                     <Link href="/progress" className="text-[11px] text-emerald-400 hover:underline font-semibold">
                       Full Charts →
@@ -1062,7 +1102,7 @@ export default function ProfilePage() {
             <div>
               <h2 className="text-base font-bold text-white">1. About You</h2>
               <p className="text-xs text-gray-400 mt-0.5">
-                Start with your basic metrics and food preference. Next, we&apos;ll tailor your specific health or weight goal.
+                Start with your basic metrics and food preference. Next, you can select one or more health goals!
               </p>
             </div>
 
@@ -1203,59 +1243,53 @@ export default function ProfilePage() {
                     : "bg-gray-800 border border-gray-700 text-gray-500 cursor-not-allowed"
                 }`}
               >
-                Next: Choose Your Goal
+                Next: Choose Your Goals
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </section>
         )}
 
-        {/* STEP 2: CHOOSE GOAL & RELEVANT QUESTIONS */}
+        {/* STEP 2: CHOOSE GOALS (MULTI-SELECT + OTHER) & RELEVANT QUESTIONS */}
         {step === 1 && (
           <section className="space-y-5 p-5 rounded-2xl glass-card border border-gray-800">
             <div>
-              <h2 className="text-base font-bold text-white">2. What Is Your Primary Goal?</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-bold text-white">2. What Are Your Goals?</h2>
+                <span className="text-[11px] font-bold text-emerald-400 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                  Select 1 or more
+                </span>
+              </div>
               <p className="text-xs text-gray-400 mt-0.5">
-                Pick the goal that fits you best — we&apos;ll ask a few relevant questions to tailor your daily tracker.
+                Select any goals that apply to you. Have a specific goal not listed? Use the &ldquo;Other&rdquo; card to mention it!
               </p>
             </div>
 
-            {/* 5 Interactive Goal Cards */}
+            {/* Goal Cards Grid (Multi-Select) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {GOAL_CARDS.map((card) => {
-                const selected = (profile.fitnessGoal || "maintain") === card.value;
+                const selected = selectedGoals.includes(card.value);
                 return (
                   <button
                     key={card.value}
                     type="button"
-                    onClick={() => {
-                      const nextTarget =
-                        card.value === "fat_loss" && profile.weightKg
-                          ? Math.max(40, Math.round((profile.weightKg - 4) * 10) / 10)
-                          : card.value === "muscle_gain" && profile.weightKg
-                          ? Math.round((profile.weightKg + 4) * 10) / 10
-                          : profile.weightKg ?? null;
-                      setP({
-                        fitnessGoal: card.value,
-                        targetWeightKg: nextTarget,
-                        weeklyPaceKg: card.value === "fat_loss" ? 0.5 : 0.25,
-                      });
-                    }}
+                    onClick={() => toggleGoal(card.value)}
                     className={`p-3.5 rounded-2xl border text-left transition flex flex-col justify-between gap-2 ${
                       selected
-                        ? "bg-[#E50914]/15 border-[#E50914] text-white shadow-md shadow-[#E50914]/10"
+                        ? "bg-[#E50914]/15 border-[#E50914] text-white shadow-md shadow-[#E50914]/10 ring-1 ring-[#E50914]"
                         : "bg-gray-900/70 border-gray-800 text-gray-300 hover:border-gray-700"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <span className="text-xl">{card.emoji}</span>
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
                           selected
                             ? "bg-[#E50914] text-white"
                             : "bg-gray-800 text-gray-400"
                         }`}
                       >
+                        {selected ? <Check className="w-3 h-3" /> : null}
                         {card.badge}
                       </span>
                     </div>
@@ -1266,23 +1300,82 @@ export default function ProfilePage() {
                   </button>
                 );
               })}
+
+              {/* Other / Custom Goal Card */}
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !isOtherGoalActive;
+                  setIsOtherGoalActive(next);
+                  if (!next) {
+                    setCustomGoalInput("");
+                    setP({ customGoal: null });
+                  }
+                }}
+                className={`p-3.5 rounded-2xl border text-left transition flex flex-col justify-between gap-2 ${
+                  isOtherGoalActive
+                    ? "bg-purple-500/15 border-purple-500 text-white shadow-md ring-1 ring-purple-500"
+                    : "bg-gray-900/70 border-gray-800 text-gray-300 hover:border-gray-700"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-xl">✍️</span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                      isOtherGoalActive
+                        ? "bg-purple-600 text-white"
+                        : "bg-gray-800 text-gray-400"
+                    }`}
+                  >
+                    {isOtherGoalActive ? <Check className="w-3 h-3" /> : null}
+                    Custom
+                  </span>
+                </div>
+                <div>
+                  <div className="text-xs font-extrabold text-white">Other / Custom Goal</div>
+                  <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">
+                    Mention your own personal health goal not listed above
+                  </p>
+                </div>
+              </button>
             </div>
+
+            {/* Custom Goal Write-In Input (appears when Other is selected) */}
+            {isOtherGoalActive && (
+              <div className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/30 space-y-2 animate-fadeIn">
+                <label className="block text-xs font-bold text-purple-200">
+                  Mention your goal(s):
+                  <input
+                    type="text"
+                    placeholder="e.g. PCOS management, Marathon prep, Lower cholesterol, Better digestion, Post-pregnancy recovery"
+                    value={customGoalInput}
+                    onChange={(e) => {
+                      setCustomGoalInput(e.target.value);
+                      setP({ customGoal: e.target.value });
+                    }}
+                    className={`${inputCls} mt-1`}
+                  />
+                </label>
+                <p className="text-[10px] text-gray-400">
+                  We&apos;ll tag your daily targets and food recommendations with this custom goal!
+                </p>
+              </div>
+            )}
 
             {/* Dynamic Relevant Questions Box */}
             <div className="p-4 rounded-2xl bg-gray-900/80 border border-gray-800 space-y-4">
               <div className="flex items-center gap-2 border-b border-gray-800 pb-2.5">
                 <Sparkles className="w-4 h-4 text-[#E50914]" />
                 <h3 className="text-xs font-extrabold text-white uppercase tracking-wider">
-                  {activeGoalCard.questionsPrompt}
+                  Goal-Specific Questions &amp; Habits
                 </h3>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-300">
                 {/* Target Weight Question (shown for Weight Loss, Muscle Gain, Maintain) */}
-                {(profile.fitnessGoal === "fat_loss" ||
-                  profile.fitnessGoal === "muscle_gain" ||
-                  !profile.fitnessGoal ||
-                  profile.fitnessGoal === "maintain") && (
+                {(selectedGoals.includes("fat_loss") ||
+                  selectedGoals.includes("muscle_gain") ||
+                  selectedGoals.includes("maintain")) && (
                   <div className="space-y-1.5">
                     <label className="block font-semibold text-gray-200">
                       Target Weight (kg)
@@ -1299,7 +1392,7 @@ export default function ProfilePage() {
                     </label>
                     {profile.weightKg && (
                       <div className="flex flex-wrap gap-1.5">
-                        {profile.fitnessGoal === "fat_loss" && (
+                        {selectedGoals.includes("fat_loss") && (
                           <>
                             <button
                               type="button"
@@ -1317,7 +1410,7 @@ export default function ProfilePage() {
                             </button>
                           </>
                         )}
-                        {profile.fitnessGoal === "muscle_gain" && (
+                        {selectedGoals.includes("muscle_gain") && (
                           <>
                             <button
                               type="button"
@@ -1354,8 +1447,8 @@ export default function ProfilePage() {
                   </div>
                 )}
 
-                {/* Weekly Pace Question (shown for Weight Loss or Muscle Gain) */}
-                {(profile.fitnessGoal === "fat_loss" || profile.fitnessGoal === "muscle_gain") && (
+                {/* Weekly Pace Question (shown if Fat Loss or Muscle Gain is among goals) */}
+                {(selectedGoals.includes("fat_loss") || selectedGoals.includes("muscle_gain")) && (
                   <label className="block font-semibold text-gray-200">
                     Target Weekly Pace
                     <select
@@ -1435,13 +1528,19 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              {/* Focus Area Chips */}
+              {/* Focus Area Chips Combining Selected Goals */}
               <div className="space-y-2 pt-1">
                 <p className="text-xs font-semibold text-gray-200">
-                  What should we prioritize in your food suggestions &amp; tracker? (Tap all that apply)
+                  What priorities should we emphasize? (Tap all that apply)
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {activeGoalCard.focusOptions.map((option) => {
+                  {Array.from(
+                    new Set(
+                      selectedGoals.flatMap(
+                        (g) => GOAL_CARDS.find((c) => c.value === g)?.focusOptions || []
+                      )
+                    )
+                  ).map((option) => {
                     const active = (profile.focusAreas || []).includes(option);
                     return (
                       <button
@@ -1477,7 +1576,7 @@ export default function ProfilePage() {
                 onClick={handleSaveGoalQuestionsAndNext}
                 className="flex items-center gap-2 px-5 py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold text-xs shadow-lg shadow-brand-500/20 transition"
               >
-                Save Goal &amp; View Daily Plan
+                Save Goals &amp; View Daily Plan
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -1500,7 +1599,7 @@ export default function ProfilePage() {
                   const rec = applyRecommendedToState();
                   setMsg({
                     type: "ok",
-                    text: `Recalculated from your goal (${rec.goals.calories} kcal, ${rec.goals.protein}g protein).`,
+                    text: `Recalculated from your goals (${rec.goals.calories} kcal, ${rec.goals.protein}g protein).`,
                   });
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-500/15 border border-brand-500/40 text-xs text-brand-300 hover:bg-brand-500/25 font-medium"
@@ -1541,7 +1640,7 @@ export default function ProfilePage() {
                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-xs text-gray-200 font-medium"
               >
                 <ChevronLeft className="w-4 h-4" />
-                Back: Goal &amp; Questions
+                Back: Goals &amp; Questions
               </button>
               <div className="flex items-center gap-2">
                 <button
