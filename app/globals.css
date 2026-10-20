@@ -1,0 +1,75 @@
+@import "tailwindcss";
+@config "../tailwind.config.ts";
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+
+:root {
+  --background: #101012;
+  --foreground: #f4f4f5;
+  --card: #18181b;
+  --card-border: #27272a;
+  --accent-emerald: #E50914;
+  --accent-cyan: #46d369;
+}
+
+body {
+  background-color: var(--background);
+  background-image: radial-gradient(circle at 50% 0%, rgba(229, 9, 20, 0.14) 0%, rgba(16, 16, 18, 0) 55%);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* EATflix Cinema Glass & Cards */
+.glass-panel {
+  background: rgba(16, 16, 18, 0.88);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: linear-gradient(180deg, rgba(28, 28, 32, 0.88) 0%, rgba(20, 20, 23, 0.92) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(229, 9, 20, 0.35);
+}
+
+.gradient-text-emerald {
+  background: linear-gradient(135deg, #E50914 0%, #ff4d57 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-text-amber {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #101012;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #E50914;
+}
