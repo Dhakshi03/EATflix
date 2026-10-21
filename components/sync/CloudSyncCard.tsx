@@ -308,6 +308,12 @@ export function CloudSyncCard({ onDataUpdated }: CloudSyncCardProps) {
       if (typeof window !== "undefined") {
         window.localStorage.setItem("eatflix_oauth_pending", "true");
         window.localStorage.setItem("eatflix_profile_step", "2");
+        try {
+          const p = await getUserProfile();
+          if (p?.displayName) {
+            window.localStorage.setItem("eatflix_pending_profile_sync", JSON.stringify(p));
+          }
+        } catch {}
       }
       const redirectTo =
         typeof window !== "undefined" ? `${window.location.origin}/profile?step=2` : undefined;
@@ -315,6 +321,10 @@ export function CloudSyncCard({ onDataUpdated }: CloudSyncCardProps) {
         provider: "google",
         options: {
           redirectTo,
+          queryParams: {
+            prompt: "select_account",
+            access_type: "offline",
+          },
         },
       });
       if (error) throw error;

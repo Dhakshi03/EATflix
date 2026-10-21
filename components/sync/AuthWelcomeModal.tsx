@@ -85,12 +85,24 @@ export function AuthWelcomeModal() {
     try {
       if (typeof window !== "undefined") {
         window.localStorage.setItem("eatflix_oauth_pending", "true");
+        try {
+          const p = await getUserProfile();
+          if (p?.displayName) {
+            window.localStorage.setItem("eatflix_pending_profile_sync", JSON.stringify(p));
+          }
+        } catch {}
       }
       const redirectTo =
         typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : undefined;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo },
+        options: {
+          redirectTo,
+          queryParams: {
+            prompt: "select_account",
+            access_type: "offline",
+          },
+        },
       });
       if (error) throw error;
     } catch (err: any) {
