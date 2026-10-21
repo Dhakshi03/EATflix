@@ -29,9 +29,9 @@ import { clearEverything, clearFoodLogs } from "@/lib/storage/maintenance";
 import { CloudSyncCard } from "@/components/sync/CloudSyncCard";
 import { getSupabaseClient } from "@/lib/sync/supabase-client";
 import {
-  ensureCleanWhenSignedOut,
   GUEST_PROFILE_ACTIVE_KEY,
   signOutAndClearLocalData,
+  syncNow,
 } from "@/lib/sync/sync-engine";
 import {
   Download,
@@ -221,8 +221,18 @@ export default function ProfilePage() {
     supabase.auth.getSession().then(({ data }) => {
       setAuthEmail(data.session?.user?.email ?? null);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
       setAuthEmail(session?.user?.email ?? null);
+      if (
+        (event === "SIGNED_IN" ||
+          event === "INITIAL_SESSION" ||
+          event === "USER_UPDATED" ||
+          event === "TOKEN_REFRESHED") &&
+        session?.user
+      ) {
+        await syncNow().catch(() => {});
+        await load(false);
+      }
     });
     return () => {
       sub?.subscription?.unsubscribe();
@@ -262,7 +272,6 @@ export default function ProfilePage() {
 
   const load = async (preserveCurrentStep = false) => {
     await seedStarterDataIfEmpty();
-    await ensureCleanWhenSignedOut();
     const p = await getUserProfile();
     const g = await getNutritionGoals();
     setProfile(p);
@@ -275,22 +284,32 @@ export default function ProfilePage() {
 
     const basicReady = getMissingBasicFields(p).length === 0;
     const fullReady = getMissingGoalFields(p).length === 0;
-    const isOAuthReturn =
+    const isAuthReturn =
       typeof window !== "undefined" &&
-      (window.location.search.includes("step=2") ||
+      (window.location.search.includes("code=") ||
+        window.location.search.includes("step=2") ||
         window.location.search.includes("step=3") ||
         window.location.hash.includes("access_token") ||
         window.localStorage.getItem("eatflix_oauth_pending") === "true");
 
-    if (isOAuthReturn) {
+    if (isAuthReturn) {
       window.localStorage.removeItem("eatflix_oauth_pending");
-      setStep1Saved(basicReady);
-      setStep2Saved(fullReady);
-      if (fullReady) {
+      await syncNow().catch(() => {});
+      const syncedP = await getUserProfile();
+      const syncedBasicReady = getMissingBasicFields(syncedP).length === 0;
+      const syncedFullReady = getMissingGoalFields(syncedP).length === 0;
+      setProfile(syncedP);
+      setQuickWeightInput(syncedP.weightKg != null ? String(syncedP.weightKg) : "");
+      setCustomGoalInput(syncedP.customGoal || "");
+      setIsOtherGoalActive(Boolean(syncedP.customGoal && syncedP.customGoal.trim()));
+      setExclusions(syncedP.allergiesAndExclusions.join(", "));
+      setStep1Saved(syncedBasicReady);
+      setStep2Saved(syncedFullReady);
+      if (syncedFullReady) {
         setIsWizardMode(false);
       } else {
         setIsWizardMode(true);
-        goToStep(3);
+        goToStep(syncedBasicReady ? 1 : 0);
       }
       return;
     }
@@ -298,11 +317,11 @@ export default function ProfilePage() {
     setStep1Saved(basicReady);
     setStep2Saved(fullReady);
 
-    if (!preserveCurrentStep) {
-      setIsWizardMode(!fullReady);
-      if (!fullReady) {
-        setStep(basicReady ? 1 : 0);
-      }
+    if (fullReady) {
+      setIsWizardMode(false);
+    } else if (!preserveCurrentStep) {
+      setIsWizardMode(true);
+      setStep(basicReady ? 1 : 0);
     }
   };
 
@@ -891,7 +910,7 @@ export default function ProfilePage() {
           </section>
 
           {/* 3. Cloud Sync Card */}
-          <CloudSyncCard onDataUpdated={() => load(true)} />
+          <CloudSyncCard onDataUpdated={() => load(false)} />
 
           {/* 4. Data & Backups Card */}
           <section className="space-y-3 p-5 rounded-2xl glass-card border border-gray-800">
@@ -1666,7 +1685,7 @@ export default function ProfilePage() {
         {/* STEP 4: CLOUD SYNC & BACKUP */}
         {step === 3 && (
           <div className="space-y-4">
-            <CloudSyncCard onDataUpdated={() => load(true)} />
+            <CloudSyncCard onDataUpdated={() => load(false)} />
 
             <section className="space-y-3 p-5 rounded-2xl glass-card border border-gray-800">
               <div>

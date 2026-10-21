@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { X, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { getSupabaseClient, getSupabaseConfig } from "@/lib/sync/supabase-client";
 import { syncNow } from "@/lib/sync/sync-engine";
+import { getUserProfile } from "@/lib/storage/indexed-db";
 import { EatflixLogo } from "@/components/navigation/EatflixLogo";
 
 export function AuthWelcomeModal() {
@@ -112,7 +113,7 @@ export function AuthWelcomeModal() {
     try {
       if (isSignUp) {
         const redirectTo =
-          typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : undefined;
+          typeof window !== "undefined" ? `${window.location.origin}/profile` : undefined;
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
@@ -124,9 +125,15 @@ export function AuthWelcomeModal() {
           setIsOpen(false);
           window.location.href = "/profile";
         } else {
+          try {
+            const p = await getUserProfile();
+            if (p?.displayName) {
+              window.localStorage.setItem("eatflix_pending_profile_sync", JSON.stringify(p));
+            }
+          } catch {}
           setStatusMsg({
             type: "ok",
-            text: "Account created! Check your email inbox to confirm, or sign in with Google above.",
+            text: "Account created! Check your email inbox to confirm, then sign in with your email to sync your profile.",
           });
         }
       } else {
@@ -136,9 +143,25 @@ export function AuthWelcomeModal() {
         });
         if (error) throw error;
         if (data.user) {
-          await syncNow().catch(() => {});
+          try {
+            await syncNow();
+          } catch (syncErr) {
+            console.warn("Initial sync after sign in:", syncErr);
+          }
           setIsOpen(false);
-          window.location.reload();
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("nutritrack:sync-complete", {
+                detail: { uploaded: 1, downloaded: 1, syncedAt: new Date().toISOString() },
+              })
+            );
+            window.dispatchEvent(new CustomEvent("nutritrack:local-change"));
+            if (window.location.pathname === "/profile") {
+              window.location.reload();
+            } else {
+              window.location.href = "/profile";
+            }
+          }
         }
       }
     } catch (err: any) {

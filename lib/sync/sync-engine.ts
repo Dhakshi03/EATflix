@@ -87,6 +87,28 @@ export function mergeRecords(
     } else if (!loc && rem) {
       toApplyLocally.push(rem);
     } else if (loc && rem) {
+      // Special smart handling for user profile
+      if (loc.collection === "profile") {
+        const isLocConfigured = Boolean(
+          loc.data?.displayName &&
+            loc.data.displayName.trim().length > 0 &&
+            loc.data.displayName !== "Fitness Tracker"
+        );
+        const isRemConfigured = Boolean(
+          rem.data?.displayName &&
+            rem.data.displayName.trim().length > 0 &&
+            rem.data.displayName !== "Fitness Tracker"
+        );
+
+        if (isRemConfigured && !isLocConfigured) {
+          toApplyLocally.push(rem);
+          continue;
+        } else if (isLocConfigured && !isRemConfigured) {
+          toUpload.push(loc);
+          continue;
+        }
+      }
+
       const locTime = Date.parse(loc.updated_at) || 0;
       const remTime = Date.parse(rem.updated_at) || 0;
       if (locTime > remTime) {
@@ -97,6 +119,9 @@ export function mergeRecords(
         // Tie-breaker: deletion wins if timestamps are identical
         if (loc.deleted) toUpload.push(loc);
         else toApplyLocally.push(rem);
+      } else {
+        // Timestamps identical: default to remote row
+        toApplyLocally.push(rem);
       }
     }
   }
@@ -159,13 +184,19 @@ export async function buildLocalSyncRows(): Promise<SyncRecordRow[]> {
 
   const profile = await getUserProfile();
   if (profile) {
-    const isConfigured = Boolean(profile.displayName && profile.displayName.trim().length > 0 && profile.age != null);
+    const isConfigured = Boolean(
+      profile.displayName &&
+        profile.displayName.trim().length > 0 &&
+        profile.displayName !== "Fitness Tracker"
+    );
     rows.push({
       collection: "profile",
       id: "default_user",
       data: profile,
       deleted: false,
-      updated_at: isConfigured ? profile.updatedAt || profile.createdAt || "1970-01-01T00:00:00.000Z" : "1970-01-01T00:00:00.000Z",
+      updated_at: isConfigured
+        ? profile.updatedAt || profile.createdAt || new Date().toISOString()
+        : "1970-01-01T00:00:00.000Z",
     });
   }
 
@@ -206,19 +237,47 @@ export async function applyRemoteRowsToIndexedDB(rows: SyncRecordRow[]): Promise
     } else if (r.collection === "profile" && !r.deleted && r.data) {
       const localProfile = await getUserProfile();
       const remoteProfile = r.data as UserProfile;
+      const isRemoteConfigured = Boolean(
+        remoteProfile.displayName &&
+        remoteProfile.displayName.trim().length > 0 &&
+        remoteProfile.displayName !== "Fitness Tracker"
+      );
+      const isLocalConfigured = Boolean(
+        localProfile.displayName &&
+        localProfile.displayName.trim().length > 0 &&
+        localProfile.displayName !== "Fitness Tracker"
+      );
+
       const mergedProfile: UserProfile = {
         ...localProfile,
         ...remoteProfile,
-        displayName:
-          remoteProfile.displayName && remoteProfile.displayName !== "Fitness Tracker"
-            ? remoteProfile.displayName
-            : localProfile.displayName || remoteProfile.displayName || "",
+        displayName: isRemoteConfigured
+          ? remoteProfile.displayName
+          : (isLocalConfigured ? localProfile.displayName : (remoteProfile.displayName || "")),
         age: remoteProfile.age ?? localProfile.age ?? null,
         biologicalSex: remoteProfile.biologicalSex ?? localProfile.biologicalSex ?? null,
         heightCm: remoteProfile.heightCm ?? localProfile.heightCm ?? null,
         weightKg: remoteProfile.weightKg ?? localProfile.weightKg ?? null,
         activityLevel: remoteProfile.activityLevel ?? localProfile.activityLevel,
         fitnessGoal: remoteProfile.fitnessGoal ?? localProfile.fitnessGoal ?? "maintain",
+        fitnessGoals:
+          remoteProfile.fitnessGoals && remoteProfile.fitnessGoals.length > 0
+            ? remoteProfile.fitnessGoals
+            : localProfile.fitnessGoals && localProfile.fitnessGoals.length > 0
+            ? localProfile.fitnessGoals
+            : [remoteProfile.fitnessGoal || localProfile.fitnessGoal || "maintain"],
+        customGoal: remoteProfile.customGoal ?? localProfile.customGoal ?? null,
+        targetWeightKg: remoteProfile.targetWeightKg ?? localProfile.targetWeightKg ?? null,
+        startingWeightKg: remoteProfile.startingWeightKg ?? localProfile.startingWeightKg ?? null,
+        weeklyPaceKg: remoteProfile.weeklyPaceKg ?? localProfile.weeklyPaceKg ?? null,
+        workoutDaysPerWeek: remoteProfile.workoutDaysPerWeek ?? localProfile.workoutDaysPerWeek ?? null,
+        waterGoalLitres: remoteProfile.waterGoalLitres ?? localProfile.waterGoalLitres ?? null,
+        weightHistory:
+          remoteProfile.weightHistory && remoteProfile.weightHistory.length > 0
+            ? remoteProfile.weightHistory
+            : localProfile.weightHistory || [],
+        dietaryPreference: remoteProfile.dietaryPreference || localProfile.dietaryPreference || "eggitarian",
+        allergiesAndExclusions: remoteProfile.allergiesAndExclusions ?? localProfile.allergiesAndExclusions ?? [],
         updatedAt: r.updated_at,
       };
       await saveUserProfile(mergedProfile, true);
@@ -371,6 +430,25 @@ export async function syncNow(): Promise<{ uploaded: number; downloaded: number;
 
     if (!session?.user) {
       throw new Error("Not signed in to Cloud Sync.");
+    }
+
+    // Restore any unauthenticated / offline profile saved during sign-up or verification
+    if (typeof window !== "undefined") {
+      const pendingProfileRaw = window.localStorage.getItem("eatflix_pending_profile_sync");
+      if (pendingProfileRaw) {
+        try {
+          const pending = JSON.parse(pendingProfileRaw) as UserProfile;
+          if (pending && pending.displayName && pending.displayName.trim().length > 0) {
+            const cur = await getUserProfile();
+            if (!cur.displayName || !cur.displayName.trim() || cur.displayName === "Fitness Tracker") {
+              await saveUserProfile(pending, false);
+            }
+          }
+        } catch {
+          // ignore parsing error
+        }
+        window.localStorage.removeItem("eatflix_pending_profile_sync");
+      }
     }
 
     // Restore any pre-sign-out snapshot before merging with remote records

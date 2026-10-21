@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { getSupabaseClient } from "@/lib/sync/supabase-client";
-import { ensureCleanWhenSignedOut, syncNow } from "@/lib/sync/sync-engine";
+import { syncNow } from "@/lib/sync/sync-engine";
 import { AuthWelcomeModal } from "./AuthWelcomeModal";
 
 export function SyncProvider() {
@@ -16,11 +16,9 @@ export function SyncProvider() {
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        if (!session?.user) {
-          await ensureCleanWhenSignedOut();
-          return;
+        if (session?.user) {
+          await syncNow();
         }
-        await syncNow();
       } catch {
         // Offline or unconfigured: fail quietly and retry next trigger
       }
@@ -31,9 +29,15 @@ export function SyncProvider() {
 
     const supabase = getSupabaseClient();
     const { data: authSub } = supabase
-      ? supabase.auth.onAuthStateChange((event, session) => {
-          if (event === "SIGNED_IN" && session?.user) {
-            trySyncQuietly();
+      ? supabase.auth.onAuthStateChange(async (event, session) => {
+          if (
+            (event === "SIGNED_IN" ||
+              event === "INITIAL_SESSION" ||
+              event === "USER_UPDATED" ||
+              event === "TOKEN_REFRESHED") &&
+            session?.user
+          ) {
+            await trySyncQuietly();
           }
         })
       : { data: { subscription: null } };

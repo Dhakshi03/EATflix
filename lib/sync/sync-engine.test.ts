@@ -11,8 +11,10 @@ import {
   getAllFoodLogs,
   getAllFoods,
   getAllTombstones,
+  getUserProfile,
   saveFood,
   saveFoodLogEntry,
+  saveUserProfile,
 } from "../storage/indexed-db";
 import { clearEverything } from "../storage/maintenance";
 import { STARTER_FOODS } from "../nutrition/starter-db";
@@ -154,5 +156,82 @@ describe("Cloud Sync Engine — mergeRecords & tombstones", () => {
     await saveFood({ ...starter, pricePerServing: 25 });
     rows = await buildLocalSyncRows();
     expect(rows.find((r) => r.collection === "foods" && r.id === starter.id)).toBeDefined();
+  });
+
+  it("prioritizes remote profile when logging in on a new device with unconfigured local profile", () => {
+    const localProfileRow: SyncRecordRow = {
+      collection: "profile",
+      id: "default_user",
+      data: { displayName: "", age: null },
+      deleted: false,
+      updated_at: "1970-01-01T00:00:00.000Z",
+    };
+
+    const remoteProfileRow: SyncRecordRow = {
+      collection: "profile",
+      id: "default_user",
+      data: {
+        displayName: "Dhakshi",
+        age: 21,
+        weightKg: 58,
+        fitnessGoals: ["fat_loss", "muscle_gain"],
+        customGoal: "Tone arms",
+      },
+      deleted: false,
+      updated_at: "2026-10-20T10:00:00.000Z",
+    };
+
+    const { toUpload, toApplyLocally } = mergeRecords([localProfileRow], [remoteProfileRow]);
+    expect(toUpload).toHaveLength(0);
+    expect(toApplyLocally).toHaveLength(1);
+    expect(toApplyLocally[0].data.displayName).toBe("Dhakshi");
+    expect(toApplyLocally[0].data.fitnessGoals).toContain("fat_loss");
+  });
+
+  it("applies remote profile to IndexedDB restoring all metrics and multi-goal preferences", async () => {
+    const remoteProfile = {
+      id: "default_user",
+      displayName: "Dhakshitha",
+      age: 21,
+      biologicalSex: "female" as const,
+      heightCm: 165,
+      weightKg: 58,
+      fitnessGoal: "fat_loss" as const,
+      fitnessGoals: ["fat_loss", "muscle_gain"] as any,
+      customGoal: "Tone core",
+      targetWeightKg: 54,
+      startingWeightKg: 62,
+      weeklyPaceKg: 0.5,
+      workoutDaysPerWeek: 4,
+      waterGoalLitres: 3,
+      weightHistory: [{ date: "2026-10-20", weightKg: 58 }],
+      dietaryPreference: "vegetarian" as const,
+      allergiesAndExclusions: ["peanuts"],
+      createdAt: "2026-10-18T10:00:00.000Z",
+      updatedAt: "2026-10-20T12:00:00.000Z",
+    };
+
+    await applyRemoteRowsToIndexedDB([
+      {
+        collection: "profile",
+        id: "default_user",
+        data: remoteProfile,
+        deleted: false,
+        updated_at: "2026-10-20T12:00:00.000Z",
+      },
+    ]);
+
+    const saved = await getUserProfile();
+    expect(saved.displayName).toBe("Dhakshitha");
+    expect(saved.age).toBe(21);
+    expect(saved.heightCm).toBe(165);
+    expect(saved.weightKg).toBe(58);
+    expect(saved.fitnessGoals).toEqual(["fat_loss", "muscle_gain"]);
+    expect(saved.customGoal).toBe("Tone core");
+    expect(saved.targetWeightKg).toBe(54);
+    expect(saved.workoutDaysPerWeek).toBe(4);
+    expect(saved.waterGoalLitres).toBe(3);
+    expect(saved.dietaryPreference).toBe("vegetarian");
+    expect(saved.allergiesAndExclusions).toEqual(["peanuts"]);
   });
 });

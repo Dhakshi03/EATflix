@@ -8,6 +8,7 @@ import {
   SUPABASE_SETUP_SQL,
 } from "@/lib/sync/supabase-client";
 import { getLastSyncTime, signOutAndClearLocalData, syncNow } from "@/lib/sync/sync-engine";
+import { getUserProfile } from "@/lib/storage/indexed-db";
 import { Cloud, RefreshCw, LogOut, Copy, Check, Settings, KeyRound, Mail } from "lucide-react";
 
 interface CloudSyncCardProps {
@@ -113,9 +114,9 @@ export function CloudSyncCard({ onDataUpdated }: CloudSyncCardProps) {
       setLastSync(res.syncedAt);
       setStatusMsg({
         type: "ok",
-        text: `Synced (${res.uploaded} uploaded, ${res.downloaded} downloaded).`,
+        text: `Synced successfully! (${res.uploaded} uploaded, ${res.downloaded} downloaded).`,
       });
-      if (res.downloaded > 0 && onDataUpdated) {
+      if (onDataUpdated) {
         onDataUpdated();
       }
     } catch (err: any) {
@@ -150,9 +151,15 @@ export function CloudSyncCard({ onDataUpdated }: CloudSyncCardProps) {
           setUserEmail(data.session.user.email ?? email.trim());
           await triggerSync();
         } else {
+          try {
+            const p = await getUserProfile();
+            if (p?.displayName) {
+              window.localStorage.setItem("eatflix_pending_profile_sync", JSON.stringify(p));
+            }
+          } catch {}
           setStatusMsg({
             type: "ok",
-            text: "Account created! If email confirmation is enabled in your Supabase project, check your inbox or disable 'Confirm email' under Authentication → Providers → Email.",
+            text: "Account created! Check your email inbox to confirm, then sign in with your email to sync your profile.",
           });
         }
       } else {
@@ -164,6 +171,9 @@ export function CloudSyncCard({ onDataUpdated }: CloudSyncCardProps) {
         if (data.user) {
           setUserEmail(data.user.email ?? email.trim());
           await triggerSync();
+          if (onDataUpdated) {
+            onDataUpdated();
+          }
         }
       }
     } catch (err: any) {
@@ -183,6 +193,12 @@ export function CloudSyncCard({ onDataUpdated }: CloudSyncCardProps) {
     }
     setSyncing(true);
     try {
+      try {
+        const p = await getUserProfile();
+        if (p?.displayName) {
+          window.localStorage.setItem("eatflix_pending_profile_sync", JSON.stringify(p));
+        }
+      } catch {}
       const redirectTo =
         typeof window !== "undefined" ? `${window.location.origin}/profile` : undefined;
       const { error } = await supabase.auth.signInWithOtp({
